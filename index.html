@@ -22,6 +22,7 @@
         #gameCanvas {
             display: block;
             background-color: #000;
+            width: 100%; height: 100%;
         }
 
         /* Ortak Ekran Stilleri */
@@ -211,6 +212,16 @@
         let selectedCarId = localStorage.getItem('selectedCarId') || 'basicCar';
         let selectedCarColor = localStorage.getItem('selectedCarColor') || '#e74c3c'; 
 
+        // Basit oyun skor değişkenleri (geliştirmeye açık)
+        let speed = 0;
+        let score = 0;
+        let driftScore = 0;
+        let coinsCollected = 0;
+
+        // Oyun döngüsü kontrolü
+        let gameRunning = false;
+        let animationId = null;
+
         // --- Araba Verileri ---
         const CARS = [
             { id: 'basicCar', name: 'Başlangıç Arabası', cost: 0, power: 1.0, handling: 1.0, mesh: 'basicCar' },
@@ -228,7 +239,7 @@
 
         // --- THREE.js Kurulumu (Minimum gereklilikler) ---
         let scene, camera, renderer;
-        let carMesh; // Şu an sadece yer tutucu
+        let carMesh = null; // Şu an sadece yer tutucu
 
         function initThreeJS() {
             scene = new THREE.Scene();
@@ -260,7 +271,16 @@
             document.querySelectorAll('.overlay-screen').forEach(screen => {
                 screen.classList.remove('active');
             });
-            document.getElementById(screenId).classList.add('active');
+            if (screenId) document.getElementById(screenId).classList.add('active');
+        }
+
+        function hideScreen(screenId) {
+            const el = document.getElementById(screenId);
+            if (el) el.classList.remove('active');
+        }
+
+        function hideAllScreens() {
+            document.querySelectorAll('.overlay-screen').forEach(screen => screen.classList.remove('active'));
         }
 
         function hideGameUI() {
@@ -271,11 +291,13 @@
         function showGameUI() {
             gameInfo.style.display = 'flex';
             gameControls.style.display = 'flex';
+            updateInGameDisplays();
         }
 
         // --- Jeton ve Araba Yönetimi ---
         function updateCoinsDisplay() {
             currentCoinsDisplay.textContent = totalCoins;
+            document.getElementById('coinsDisplay').textContent = totalCoins;
             localStorage.setItem('totalCoins', totalCoins);
         }
 
@@ -317,6 +339,7 @@
                                 totalCoins -= car.cost;
                                 unlockedCars.push(car.id);
                                 selectedCarId = car.id;
+                                localStorage.setItem('selectedCarId', selectedCarId);
                                 updateCoinsDisplay();
                                 saveUnlockedCars();
                                 renderCarSelection(); 
@@ -327,6 +350,7 @@
                         }
                     } else {
                         selectedCarId = car.id;
+                        localStorage.setItem('selectedCarId', selectedCarId);
                         renderCarSelection(); 
                         updateCarModel(selectedCarId, selectedCarColor);
                     }
@@ -354,10 +378,20 @@
 
         // --- Three.js Araba Modelleri (Şimdilik basit küpler, sonra gerçek modellerle değişecek) ---
         function createCarMesh(carId, color) {
+            // Eski mesh varsa temizle
             if (carMesh) {
-                scene.remove(carMesh);
-                carMesh.geometry.dispose();
-                carMesh.material.dispose();
+                try {
+                    scene.remove(carMesh);
+                    if (carMesh.geometry) carMesh.geometry.dispose();
+                    if (Array.isArray(carMesh.material)) {
+                        carMesh.material.forEach(m => { if (m) m.dispose(); });
+                    } else if (carMesh.material) {
+                        carMesh.material.dispose();
+                    }
+                } catch (e) {
+                    console.warn('Mesh temizlenirken hata: ', e);
+                }
+                carMesh = null;
             }
 
             let geometry;
@@ -390,20 +424,22 @@
             createCarMesh(carId, color); 
         }
 
+        // --- Yardımcı: in-game göstergeleri güncelle ---
+        function updateInGameDisplays() {
+            document.getElementById('speedDisplay').textContent = Math.round(speed);
+            document.getElementById('scoreDisplay').textContent = score;
+            document.getElementById('driftScoreDisplay').textContent = driftScore;
+            document.getElementById('coinsDisplay').textContent = totalCoins;
+        }
+
         // --- Oyun Durumu ve Akışı ---
         function initGame() {
-            playerName = localStorage.getItem('playerName') || '';
+            playerName = (localStorage.getItem('playerName') || '').trim();
             if (playerName) {
                 playerNameInput.value = playerName;
             }
             updateCoinsDisplay();
-            // renderCarSelection() burayı yorum satırı yaptık çünkü goToCarSelectionButton'a basınca çağrılmalı
-            
-            // Oyun müziği için Audio nesnesi (telifsiz müzik linki sonra güncellenecek)
-            // let backgroundMusic = new Audio('path/to/your/music.mp3'); 
-            // backgroundMusic.loop = true;
-            // backgroundMusic.volume = 0.5;
-            // backgroundMusic.play(); 
+            // renderCarSelection() burayı goToCarSelectionButton'a basınca çağırıyoruz
         }
 
         function startGameLogic() {
@@ -411,17 +447,46 @@
                 alert("Lütfen bir araba seçin!");
                 return;
             }
-            hideScreen('car-selection-screen'); 
-            showGameUI(); 
-            animate();
+
+            // Eğer oyun halihazırda çalışıyorsa önce durdur
+            if (gameRunning && animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+                gameRunning = false;
+            }
+
+            // Oyun içi değişkenleri resetle (basit başlangıç)
+            speed = 0;
+            score = 0;
+            driftScore = 0;
+            coinsCollected = 0;
+
+            // Ekranları gizle ve oyun UI göster
+            hideAllScreens();
+            showGameUI();
+
+            // Seçili arabayı sahneye yerleştir
+            updateCarModel(selectedCarId, selectedCarColor);
+
+            // Başlat - animasyon döngüsü yalnızca bir kez başlatılmalı
+            if (!gameRunning) {
+                gameRunning = true;
+                animate();
+            }
+
             console.log(`Oyun başladı! Oyuncu: ${playerName}, Araba: ${selectedCarId}, Renk: ${selectedCarColor}`);
         }
 
         function endGameLogic() {
-            finalPlayerNameDisplay.textContent = playerName;
-            finalScoreDisplay.textContent = 0; 
-            finalDriftScoreDisplay.textContent = 0; 
-            finalCoinsCollectedDisplay.textContent = 0; 
+            // Animasyonu durdur
+            if (animationId) cancelAnimationFrame(animationId);
+            animationId = null;
+            gameRunning = false;
+
+            finalPlayerNameDisplay.textContent = playerName || 'Oyuncu';
+            finalScoreDisplay.textContent = score;
+            finalDriftScoreDisplay.textContent = driftScore;
+            finalCoinsCollectedDisplay.textContent = coinsCollected;
 
             showScreen('end-game-screen');
             hideGameUI();
@@ -429,8 +494,13 @@
 
         // --- THREE.js Animasyon Döngüsü ---
         function animate() {
-            requestAnimationFrame(animate);
-            // Burada oyun mantığı ve araba hareketleri işlenecek
+            animationId = requestAnimationFrame(animate);
+            // Basit örnek oyun mantığı (geliştirilmeye açık)
+            // Örneğin hız zamanla yükseltilip gösterilebilir
+            speed = Math.min(200, speed + 0.05);
+            score += 0; // placeholder
+            // Göstergeleri güncelle
+            updateInGameDisplays();
             renderer.render(scene, camera);
         }
 
