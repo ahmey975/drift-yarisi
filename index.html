@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Murat Şener Ultimate Drift Yarışı</title>
 
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="./manifest.json"> 
     <meta name="theme-color" content="#212121">
 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
@@ -179,10 +179,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script>
         // Oyunun tüm JavaScript kodu buraya gelecek
-        // Şu an sadece temel Three.js kurulumu ve ekran geçişleri var.
-        // Oyun mantığı, araba seçimi vb. sonraki adımlarda eklenecek.
-
+        
         // --- DOM Elementleri ---
+        const gameCanvas = document.getElementById('gameCanvas'); // Canvas elementini de tanımlıyoruz
         const startScreen = document.getElementById('start-screen');
         const playerNameInput = document.getElementById('playerNameInput');
         const goToCarSelectionButton = document.getElementById('goToCarSelection');
@@ -207,10 +206,10 @@
 
         // --- Oyun Değişkenleri ---
         let playerName = '';
-        let totalCoins = parseInt(localStorage.getItem('totalCoins') || '0'); // Yerel depolamadan jetonları çek
-        let unlockedCars = JSON.parse(localStorage.getItem('unlockedCars') || '["basicCar"]'); // Başlangıçta ilk araba açık
+        let totalCoins = parseInt(localStorage.getItem('totalCoins') || '0'); 
+        let unlockedCars = JSON.parse(localStorage.getItem('unlockedCars') || '["basicCar"]');
         let selectedCarId = localStorage.getItem('selectedCarId') || 'basicCar';
-        let selectedCarColor = localStorage.getItem('selectedCarColor') || '#e74c3c'; // Kırmızı varsayılan
+        let selectedCarColor = localStorage.getItem('selectedCarColor') || '#e74c3c'; 
 
         // --- Araba Verileri ---
         const CARS = [
@@ -234,22 +233,19 @@
         function initThreeJS() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ antialias: true, canvas: gameCanvas }); // Canvas'ı belirtiyoruz
+            renderer = new THREE.WebGLRenderer({ antialias: true, canvas: gameCanvas }); 
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setClearColor(0x222222); // Sahne arka plan rengi
+            renderer.setClearColor(0x222222); 
 
-            // Basit bir ışık
-            const ambientLight = new THREE.AmbientLight(0x404040); // yumuşak beyaz ışık
+            const ambientLight = new THREE.AmbientLight(0x404040); 
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
             directionalLight.position.set(0, 1, 1);
             scene.add(directionalLight);
 
-            // Kamera konumu (şimdilik)
             camera.position.set(0, 5, 10);
             camera.lookAt(0, 0, 0);
 
-            // Pencere boyutu değiştiğinde renderer'ı güncelle
             window.addEventListener('resize', onWindowResize, false);
         }
 
@@ -288,7 +284,7 @@
         }
 
         function renderCarSelection() {
-            carOptionsContainer.innerHTML = ''; // Önceki kartları temizle
+            carOptionsContainer.innerHTML = ''; 
             CARS.forEach(car => {
                 const isLocked = !unlockedCars.includes(car.id);
                 const isSelected = selectedCarId === car.id;
@@ -299,11 +295,11 @@
 
                 let imageUrl;
                 switch (car.id) {
-                    case 'basicCar': imageUrl = 'car-model-basic.png'; break;
-                    case 'sportCar': imageUrl = 'car-model-sport.png'; break;
-                    case 'proCar': imageUrl = 'car-model-pro.png'; break;
-                    case 'driftKing': imageUrl = 'car-model-king.png'; break;
-                    default: imageUrl = 'car-model-basic.png';
+                    case 'basicCar': imageUrl = './car-model-basic.png'; break; // './' eklendi
+                    case 'sportCar': imageUrl = './car-model-sport.png'; break; // './' eklendi
+                    case 'proCar': imageUrl = './car-model-pro.png'; break;   // './' eklendi
+                    case 'driftKing': imageUrl = './car-model-king.png'; break; // './' eklendi
+                    default: imageUrl = './car-model-basic.png';
                 }
 
                 carCard.innerHTML = `
@@ -323,8 +319,7 @@
                                 selectedCarId = car.id;
                                 updateCoinsDisplay();
                                 saveUnlockedCars();
-                                renderCarSelection(); // Kartları yeniden çiz
-                                // Arabanın 3D modelini güncelle
+                                renderCarSelection(); 
                                 updateCarModel(selectedCarId, selectedCarColor);
                             }
                         } else {
@@ -332,14 +327,12 @@
                         }
                     } else {
                         selectedCarId = car.id;
-                        renderCarSelection(); // Kartları yeniden çiz
-                        // Arabanın 3D modelini güncelle
+                        renderCarSelection(); 
                         updateCarModel(selectedCarId, selectedCarColor);
                     }
                 });
             });
 
-            // Renk seçeneklerini render et
             colorOptionsContainer.innerHTML = '';
             for (const colorName in COLORS) {
                 const colorHex = COLORS[colorName];
@@ -352,8 +345,8 @@
                 colorBox.addEventListener('click', () => {
                     selectedCarColor = colorHex;
                     localStorage.setItem('selectedCarColor', selectedCarColor);
-                    renderCarSelection(); // Renk seçili stilini güncelle
-                    updateCarModel(selectedCarId, selectedCarColor); // 3D modelin rengini güncelle
+                    renderCarSelection(); 
+                    updateCarModel(selectedCarId, selectedCarColor);
                 });
             }
         }
@@ -361,7 +354,6 @@
 
         // --- Three.js Araba Modelleri (Şimdilik basit küpler, sonra gerçek modellerle değişecek) ---
         function createCarMesh(carId, color) {
-            // Varolan arabayı kaldır
             if (carMesh) {
                 scene.remove(carMesh);
                 carMesh.geometry.dispose();
@@ -371,16 +363,16 @@
             let geometry;
             switch (carId) {
                 case 'basicCar':
-                    geometry = new THREE.BoxGeometry(1.5, 0.8, 3); // Basit araba
+                    geometry = new THREE.BoxGeometry(1.5, 0.8, 3); 
                     break;
                 case 'sportCar':
-                    geometry = new THREE.BoxGeometry(1.4, 0.7, 3.2); // Biraz daha uzun ve alçak
+                    geometry = new THREE.BoxGeometry(1.4, 0.7, 3.2); 
                     break;
                 case 'proCar':
-                    geometry = new THREE.BoxGeometry(1.3, 0.6, 3.5); // Daha uzun ve alçak
+                    geometry = new THREE.BoxGeometry(1.3, 0.6, 3.5); 
                     break;
                 case 'driftKing':
-                    geometry = new THREE.BoxGeometry(1.5, 0.7, 3.8); // En uzun ve kaslı
+                    geometry = new THREE.BoxGeometry(1.5, 0.7, 3.8); 
                     break;
                 default:
                     geometry = new THREE.BoxGeometry(1.5, 0.8, 3);
@@ -388,15 +380,14 @@
             const material = new THREE.MeshPhongMaterial({ color: color });
             carMesh = new THREE.Mesh(geometry, material);
             scene.add(carMesh);
-            carMesh.position.set(0, 0.5, 0); // Yere oturt
+            carMesh.position.set(0, 0.5, 0); 
 
-            // Kamera pozisyonunu arabaya göre ayarla (test amaçlı)
             camera.position.set(0, 8, 15);
             camera.lookAt(carMesh.position);
         }
 
         function updateCarModel(carId, color) {
-            createCarMesh(carId, color); // Yeni arabayı oluştur
+            createCarMesh(carId, color); 
         }
 
         // --- Oyun Durumu ve Akışı ---
@@ -406,13 +397,13 @@
                 playerNameInput.value = playerName;
             }
             updateCoinsDisplay();
-            renderCarSelection(); // Araba seçim ekranını hazırlayın
+            // renderCarSelection() burayı yorum satırı yaptık çünkü goToCarSelectionButton'a basınca çağrılmalı
             
             // Oyun müziği için Audio nesnesi (telifsiz müzik linki sonra güncellenecek)
             // let backgroundMusic = new Audio('path/to/your/music.mp3'); 
             // backgroundMusic.loop = true;
             // backgroundMusic.volume = 0.5;
-            // backgroundMusic.play(); // Oyuncu etkileşimi sonrası başlatılabilir
+            // backgroundMusic.play(); 
         }
 
         function startGameLogic() {
@@ -420,22 +411,17 @@
                 alert("Lütfen bir araba seçin!");
                 return;
             }
-            // Oyunu başlatma animasyonu ve mantığı buraya gelecek
-            // Şu an sadece ekran geçişi yapıyoruz.
-            hideGameUI();
-            showGameUI(); // Oyun içi UI'ı göster
-            hideScreen('car-selection-screen'); // Araba seçim ekranını kapat
-            // three.js render döngüsü burada başlayacak
+            hideScreen('car-selection-screen'); 
+            showGameUI(); 
             animate();
             console.log(`Oyun başladı! Oyuncu: ${playerName}, Araba: ${selectedCarId}, Renk: ${selectedCarColor}`);
         }
 
         function endGameLogic() {
-            // Oyun sonu mantığı
             finalPlayerNameDisplay.textContent = playerName;
-            finalScoreDisplay.textContent = 0; // Gerçek skor olacak
-            finalDriftScoreDisplay.textContent = 0; // Gerçek drift skoru olacak
-            finalCoinsCollectedDisplay.textContent = 0; // Gerçek toplanan jeton olacak
+            finalScoreDisplay.textContent = 0; 
+            finalDriftScoreDisplay.textContent = 0; 
+            finalCoinsCollectedDisplay.textContent = 0; 
 
             showScreen('end-game-screen');
             hideGameUI();
@@ -445,8 +431,6 @@
         function animate() {
             requestAnimationFrame(animate);
             // Burada oyun mantığı ve araba hareketleri işlenecek
-            // carMesh.rotation.y += 0.01; // Test için dönme
-
             renderer.render(scene, camera);
         }
 
@@ -457,32 +441,33 @@
                 return;
             }
             playerName = playerNameInput.value.trim();
-            localStorage.setItem('playerName', playerName); // Adı kaydet
+            localStorage.setItem('playerName', playerName); 
             displayPlayerName.textContent = playerName;
-            updateCoinsDisplay(); // Jetonları güncelle
+            updateCoinsDisplay(); 
             renderCarSelection(); // Araba seçim ekranını hazırla
-            showScreen('car-selection-screen');
+            showScreen('car-selection-screen'); // Araba seçim ekranını göster
+            updateCarModel(selectedCarId, selectedCarColor); // Seçili arabanın 3D modelini oluştur
         });
 
         startGameButton.addEventListener('click', startGameLogic);
-        restartGameButton.addEventListener('click', startGameLogic); // Şimdilik aynı
+        restartGameButton.addEventListener('click', startGameLogic); 
         backToSelectionButton.addEventListener('click', () => {
             showScreen('car-selection-screen');
-            displayPlayerName.textContent = playerName; // Adı tekrar göster
+            displayPlayerName.textContent = playerName; 
             updateCoinsDisplay();
-            renderCarSelection(); // Araba seçim ekranını yeniden yükle
+            renderCarSelection(); 
+            updateCarModel(selectedCarId, selectedCarColor); // Geri dönüldüğünde 3D modeli tekrar oluştur
         });
 
         // --- Uygulama Başlangıcı ---
         initThreeJS();
-        initGame(); // Jetonları, kilitli arabaları ve ismi yükle
-        createCarMesh(selectedCarId, selectedCarColor); // Başlangıç arabasını oluştur
+        initGame(); 
+        // createCarMesh(selectedCarId, selectedCarColor); // Başlangıçta 3D model oluşturmayı iptal ettik, seçim ekranına geçince oluşacak
 
-
-        // PWA Service Worker Kaydı (önceki projedeki gibi)
+        // PWA Service Worker Kaydı 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+                navigator.serviceWorker.register('./service-worker.js', { scope: './' }) // './' eklendi
                     .then(registration => {
                         console.log('ServiceWorker registration successful with scope: ', registration.scope);
                     })
@@ -491,4 +476,6 @@
                     });
             });
         }
-```
+    </script>
+</body>
+</html>
