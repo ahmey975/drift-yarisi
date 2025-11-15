@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Murat Şener Ultimate Drift Yarışı</title>
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#212121">
+
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body, html {
+            margin: 0; padding: 0; overflow: hidden; height: 100%; width: 100%;
+            font-family: 'Roboto', sans-serif; background-color: #1a1a1a; color: #eee;
+            user-select: none; /* Metin seçmeyi engelle */
+            -webkit-tap-highlight-color: transparent; /* Mobil dokunuş vurgusunu kaldır */
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        #gameCanvas {
+            display: block;
+            background-color: #000;
+        }
+
+        /* Ortak Ekran Stilleri */
+        .overlay-screen {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.9); color: white;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; text-align: center;
+            padding: 20px; box-sizing: border-box;
+            opacity: 0; /* Başlangıçta gizli */
+            transition: opacity 0.5s ease-in-out;
+            pointer-events: none; /* Başlangıçta tıklanamaz */
+        }
+        .overlay-screen.active {
+            opacity: 1;
+            pointer-events: auto; /* Aktifken tıklanabilir */
+        }
+        .overlay-screen h1 { font-size: clamp(30px, 9vw, 50px); margin-bottom: 15px; color: #fdd835; }
+        .overlay-screen h2 { font-size: clamp(22px, 7vw, 35px); margin-bottom: 10px; color: #fdd835; }
+        .overlay-screen p { font-size: clamp(16px, 4vw, 20px); margin-bottom: 20px; max-width: 80%; }
+        .overlay-screen button {
+            padding: 12px 25px; font-size: clamp(16px, 4.5vw, 22px);
+            background-color: #2196f3; color: white; border: none; border-radius: 8px;
+            cursor: pointer; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.4);
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            margin: 10px;
+        }
+        .overlay-screen button:hover { background-color: #1976d2; transform: translateY(-2px); }
+        .overlay-screen button:active { transform: translateY(0); }
+        .input-group { margin-bottom: 20px; }
+        .input-group input {
+            padding: 10px 15px; font-size: clamp(16px, 4vw, 20px);
+            border: 2px solid #555; border-radius: 5px; background-color: #333;
+            color: white; text-align: center;
+            outline: none; transition: border-color 0.2s ease;
+        }
+        .input-group input:focus { border-color: #2196f3; }
+        .info-text { font-size: clamp(14px, 3.5vw, 18px); color: #bbb; margin-top: 10px; }
+
+
+        /* Araba Seçim Ekranı */
+        #car-selection-screen .car-options {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 25px;
+        }
+        #car-selection-screen .car-card {
+            background-color: #2a2a2a; border: 2px solid #444; border-radius: 10px;
+            padding: 15px; width: clamp(120px, 30vw, 180px); cursor: pointer;
+            transition: transform 0.1s ease, border-color 0.2s ease;
+            position: relative; overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        #car-selection-screen .car-card.selected { border-color: #fdd835; transform: translateY(-5px); }
+        #car-selection-screen .car-card:hover:not(.locked) { transform: translateY(-5px); }
+        #car-selection-screen .car-card h3 { font-size: clamp(18px, 4.5vw, 24px); margin-top: 5px; margin-bottom: 5px; color: #fdd835; }
+        #car-selection-screen .car-card p { font-size: clamp(12px, 3vw, 16px); color: #ccc; margin-bottom: 10px; }
+        #car-selection-screen .car-card img {
+            width: 100%; height: auto; object-fit: contain; margin-bottom: 10px;
+            filter: grayscale(0%); /* Kilitli arabalarda değişecek */
+        }
+        #car-selection-screen .car-card.locked img { filter: grayscale(100%) brightness(50%); }
+        .locked-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center;
+            color: white; font-size: clamp(16px, 4.5vw, 24px); font-weight: bold;
+            flex-direction: column; gap: 5px;
+        }
+        .locked-overlay span { font-size: clamp(14px, 4vw, 20px); } /* Jeton maliyeti */
+        .color-options { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
+        .color-box {
+            width: clamp(30px, 8vw, 40px); height: clamp(30px, 8vw, 40px);
+            border: 2px solid #555; border-radius: 50%; cursor: pointer;
+            transition: transform 0.1s ease, border-color 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        .color-box.selected { border-color: #fdd835; transform: scale(1.1); }
+        .color-box:hover { transform: scale(1.05); }
+
+        /* Oyun İçi Bilgi Paneli ve Kontroller */
+        #game-info {
+            position: absolute; top: 0; width: 100%; padding: 10px;
+            background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: space-around;
+            font-size: clamp(14px, 3.5vw, 18px); font-weight: bold; z-index: 90;
+        }
+        #game-controls {
+            position: absolute; bottom: 0; width: 100%; display: flex;
+            justify-content: space-between; padding: 10px; box-sizing: border-box; z-index: 90;
+        }
+        .control-group { display: flex; gap: 5px; }
+        .control-button {
+            background-color: rgba(0, 0, 0, 0.6); color: #fff;
+            border: 2px solid #666; border-radius: 50%;
+            width: clamp(60px, 16vw, 80px); height: clamp(60px, 16vw, 80px);
+            display: flex; justify-content: center; align-items: center;
+            font-size: clamp(20px, 6vw, 30px); cursor: pointer;
+            transition: background-color 0.1s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+        }
+        .control-button:active { background-color: rgba(0, 0, 0, 0.9); border-color: #eee; }
+
+        /* Bitiş Ekranı */
+        #end-game-screen p { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="start-screen" class="overlay-screen active">
+        <h1>Murat Şener Ultimate Drift Yarışı</h1>
+        <p>Merhaba, lütfen adınızı girin:</p>
+        <div class="input-group">
+            <input type="text" id="playerNameInput" placeholder="Adınız" maxlength="15">
+        </div>
+        <button id="goToCarSelection">DEVAM ET</button>
+    </div>
+
+    <div id="car-selection-screen" class="overlay-screen">
+        <h2>Araba Seçimi</h2>
+        <p>Hoş geldin <span id="displayPlayerName"></span>! Arabanı seç ve pistleri fethet!</p>
+        <div class="car-options">
+            </div>
+        <div class="color-options">
+            </div>
+        <div class="info-text">Jetonların: <span id="currentCoinsDisplay">0</span></div>
+        <button id="startGameButton">OYUNA BAŞLA</button>
+    </div>
+
+    <div id="game-info" style="display: none;">
+        <div>Hız: <span id="speedDisplay">0</span> km/s</div>
+        <div>Skor: <span id="scoreDisplay">0</span></div>
+        <div>Drift: <span id="driftScoreDisplay">0</span></div>
+        <div>Jeton: <span id="coinsDisplay">0</span></div>
+    </div>
+
+    <div id="game-controls" style="display: none;">
+        <div class="control-group">
+            <div id="leftButton" class="control-button">⬅️</div>
+            <div id="rightButton" class="control-button">➡️</div>
+        </div>
+        <div class="control-group">
+            <div id="accelerateButton" class="control-button">⬆️</div>
+            <div id="brakeButton" class="control-button">⬇️</div>
+        </div>
+    </div>
+
+    <div id="end-game-screen" class="overlay-screen">
+        <h1>OYUN BİTTİ!</h1>
+        <p>Tebrikler <span id="finalPlayerName"></span>!</p>
+        <p>Final Skorun: <span id="finalScoreDisplay">0</span></p>
+        <p>En Yüksek Drift Skoru: <span id="finalDriftScoreDisplay">0</span></p>
+        <p>Toplam Toplanan Jeton: <span id="finalCoinsCollectedDisplay">0</span></p>
+        <button id="restartGameButton">YENİDEN BAŞLA</button>
+        <button id="backToSelectionButton">ARABA SEÇİMİNE DÖN</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
+    <script>
+        // Oyunun tüm JavaScript kodu buraya gelecek
+        // Şu an sadece temel Three.js kurulumu ve ekran geçişleri var.
+        // Oyun mantığı, araba seçimi vb. sonraki adımlarda eklenecek.
+
+        // --- DOM Elementleri ---
+        const startScreen = document.getElementById('start-screen');
+        const playerNameInput = document.getElementById('playerNameInput');
+        const goToCarSelectionButton = document.getElementById('goToCarSelection');
+
+        const carSelectionScreen = document.getElementById('car-selection-screen');
+        const displayPlayerName = document.getElementById('displayPlayerName');
+        const carOptionsContainer = carSelectionScreen.querySelector('.car-options');
+        const colorOptionsContainer = carSelectionScreen.querySelector('.color-options');
+        const currentCoinsDisplay = document.getElementById('currentCoinsDisplay');
+        const startGameButton = document.getElementById('startGameButton');
+
+        const gameInfo = document.getElementById('game-info');
+        const gameControls = document.getElementById('game-controls');
+
+        const endGameScreen = document.getElementById('end-game-screen');
+        const finalPlayerNameDisplay = document.getElementById('finalPlayerName');
+        const finalScoreDisplay = document.getElementById('finalScoreDisplay');
+        const finalDriftScoreDisplay = document.getElementById('finalDriftScoreDisplay');
+        const finalCoinsCollectedDisplay = document.getElementById('finalCoinsCollectedDisplay');
+        const restartGameButton = document.getElementById('restartGameButton');
+        const backToSelectionButton = document.getElementById('backToSelectionButton');
+
+        // --- Oyun Değişkenleri ---
+        let playerName = '';
+        let totalCoins = parseInt(localStorage.getItem('totalCoins') || '0'); // Yerel depolamadan jetonları çek
+        let unlockedCars = JSON.parse(localStorage.getItem('unlockedCars') || '["basicCar"]'); // Başlangıçta ilk araba açık
+        let selectedCarId = localStorage.getItem('selectedCarId') || 'basicCar';
+        let selectedCarColor = localStorage.getItem('selectedCarColor') || '#e74c3c'; // Kırmızı varsayılan
+
+        // --- Araba Verileri ---
+        const CARS = [
+            { id: 'basicCar', name: 'Başlangıç Arabası', cost: 0, power: 1.0, handling: 1.0, mesh: 'basicCar' },
+            { id: 'sportCar', name: 'Spor Araba', cost: 50, power: 1.3, handling: 1.2, mesh: 'sportCar' },
+            { id: 'proCar', name: 'Profesyonel', cost: 150, power: 1.6, handling: 1.5, mesh: 'proCar' },
+            { id: 'driftKing', name: 'Drift Kralı', cost: 300, power: 2.0, handling: 1.8, mesh: 'driftKing' }
+        ];
+
+        const COLORS = {
+            Red: '#e74c3c',
+            Blue: '#3498db',
+            Black: '#2c3e50',
+            White: '#ecf0f1'
+        };
+
+        // --- THREE.js Kurulumu (Minimum gereklilikler) ---
+        let scene, camera, renderer;
+        let carMesh; // Şu an sadece yer tutucu
+
+        function initThreeJS() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true, canvas: gameCanvas }); // Canvas'ı belirtiyoruz
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x222222); // Sahne arka plan rengi
+
+            // Basit bir ışık
+            const ambientLight = new THREE.AmbientLight(0x404040); // yumuşak beyaz ışık
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(0, 1, 1);
+            scene.add(directionalLight);
+
+            // Kamera konumu (şimdilik)
+            camera.position.set(0, 5, 10);
+            camera.lookAt(0, 0, 0);
+
+            // Pencere boyutu değiştiğinde renderer'ı güncelle
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Ekran Geçiş Fonksiyonları ---
+        function showScreen(screenId) {
+            document.querySelectorAll('.overlay-screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function hideGameUI() {
+            gameInfo.style.display = 'none';
+            gameControls.style.display = 'none';
+        }
+
+        function showGameUI() {
+            gameInfo.style.display = 'flex';
+            gameControls.style.display = 'flex';
+        }
+
+        // --- Jeton ve Araba Yönetimi ---
+        function updateCoinsDisplay() {
+            currentCoinsDisplay.textContent = totalCoins;
+            localStorage.setItem('totalCoins', totalCoins);
+        }
+
+        function saveUnlockedCars() {
+            localStorage.setItem('unlockedCars', JSON.stringify(unlockedCars));
+        }
+
+        function renderCarSelection() {
+            carOptionsContainer.innerHTML = ''; // Önceki kartları temizle
+            CARS.forEach(car => {
+                const isLocked = !unlockedCars.includes(car.id);
+                const isSelected = selectedCarId === car.id;
+
+                const carCard = document.createElement('div');
+                carCard.className = `car-card ${isLocked ? 'locked' : ''} ${isSelected ? 'selected' : ''}`;
+                carCard.dataset.carId = car.id;
+
+                let imageUrl;
+                switch (car.id) {
+                    case 'basicCar': imageUrl = 'car-model-basic.png'; break;
+                    case 'sportCar': imageUrl = 'car-model-sport.png'; break;
+                    case 'proCar': imageUrl = 'car-model-pro.png'; break;
+                    case 'driftKing': imageUrl = 'car-model-king.png'; break;
+                    default: imageUrl = 'car-model-basic.png';
+                }
+
+                carCard.innerHTML = `
+                    <h3>${car.name}</h3>
+                    <img src="${imageUrl}" alt="${car.name}">
+                    <p>Güç: ${car.power.toFixed(1)} | Kontrol: ${car.handling.toFixed(1)}</p>
+                    ${isLocked ? `<div class="locked-overlay">KİLİTLİ<br/><span>${car.cost} Jeton</span></div>` : ''}
+                `;
+                carOptionsContainer.appendChild(carCard);
+
+                carCard.addEventListener('click', () => {
+                    if (isLocked) {
+                        if (totalCoins >= car.cost) {
+                            if (confirm(`${car.name} arabasını ${car.cost} jetona açmak istiyor musun?`)) {
+                                totalCoins -= car.cost;
+                                unlockedCars.push(car.id);
+                                selectedCarId = car.id;
+                                updateCoinsDisplay();
+                                saveUnlockedCars();
+                                renderCarSelection(); // Kartları yeniden çiz
+                                // Arabanın 3D modelini güncelle
+                                updateCarModel(selectedCarId, selectedCarColor);
+                            }
+                        } else {
+                            alert(`Bu arabayı açmak için ${car.cost - totalCoins} jetona daha ihtiyacın var.`);
+                        }
+                    } else {
+                        selectedCarId = car.id;
+                        renderCarSelection(); // Kartları yeniden çiz
+                        // Arabanın 3D modelini güncelle
+                        updateCarModel(selectedCarId, selectedCarColor);
+                    }
+                });
+            });
+
+            // Renk seçeneklerini render et
+            colorOptionsContainer.innerHTML = '';
+            for (const colorName in COLORS) {
+                const colorHex = COLORS[colorName];
+                const colorBox = document.createElement('div');
+                colorBox.className = `color-box ${selectedCarColor === colorHex ? 'selected' : ''}`;
+                colorBox.style.backgroundColor = colorHex;
+                colorBox.dataset.colorHex = colorHex;
+                colorOptionsContainer.appendChild(colorBox);
+
+                colorBox.addEventListener('click', () => {
+                    selectedCarColor = colorHex;
+                    localStorage.setItem('selectedCarColor', selectedCarColor);
+                    renderCarSelection(); // Renk seçili stilini güncelle
+                    updateCarModel(selectedCarId, selectedCarColor); // 3D modelin rengini güncelle
+                });
+            }
+        }
+
+
+        // --- Three.js Araba Modelleri (Şimdilik basit küpler, sonra gerçek modellerle değişecek) ---
+        function createCarMesh(carId, color) {
+            // Varolan arabayı kaldır
+            if (carMesh) {
+                scene.remove(carMesh);
+                carMesh.geometry.dispose();
+                carMesh.material.dispose();
+            }
+
+            let geometry;
+            switch (carId) {
+                case 'basicCar':
+                    geometry = new THREE.BoxGeometry(1.5, 0.8, 3); // Basit araba
+                    break;
+                case 'sportCar':
+                    geometry = new THREE.BoxGeometry(1.4, 0.7, 3.2); // Biraz daha uzun ve alçak
+                    break;
+                case 'proCar':
+                    geometry = new THREE.BoxGeometry(1.3, 0.6, 3.5); // Daha uzun ve alçak
+                    break;
+                case 'driftKing':
+                    geometry = new THREE.BoxGeometry(1.5, 0.7, 3.8); // En uzun ve kaslı
+                    break;
+                default:
+                    geometry = new THREE.BoxGeometry(1.5, 0.8, 3);
+            }
+            const material = new THREE.MeshPhongMaterial({ color: color });
+            carMesh = new THREE.Mesh(geometry, material);
+            scene.add(carMesh);
+            carMesh.position.set(0, 0.5, 0); // Yere oturt
+
+            // Kamera pozisyonunu arabaya göre ayarla (test amaçlı)
+            camera.position.set(0, 8, 15);
+            camera.lookAt(carMesh.position);
+        }
+
+        function updateCarModel(carId, color) {
+            createCarMesh(carId, color); // Yeni arabayı oluştur
+        }
+
+        // --- Oyun Durumu ve Akışı ---
+        function initGame() {
+            playerName = localStorage.getItem('playerName') || '';
+            if (playerName) {
+                playerNameInput.value = playerName;
+            }
+            updateCoinsDisplay();
+            renderCarSelection(); // Araba seçim ekranını hazırlayın
+            
+            // Oyun müziği için Audio nesnesi (telifsiz müzik linki sonra güncellenecek)
+            // let backgroundMusic = new Audio('path/to/your/music.mp3'); 
+            // backgroundMusic.loop = true;
+            // backgroundMusic.volume = 0.5;
+            // backgroundMusic.play(); // Oyuncu etkileşimi sonrası başlatılabilir
+        }
+
+        function startGameLogic() {
+            if (!selectedCarId) {
+                alert("Lütfen bir araba seçin!");
+                return;
+            }
+            // Oyunu başlatma animasyonu ve mantığı buraya gelecek
+            // Şu an sadece ekran geçişi yapıyoruz.
+            hideGameUI();
+            showGameUI(); // Oyun içi UI'ı göster
+            hideScreen('car-selection-screen'); // Araba seçim ekranını kapat
+            // three.js render döngüsü burada başlayacak
+            animate();
+            console.log(`Oyun başladı! Oyuncu: ${playerName}, Araba: ${selectedCarId}, Renk: ${selectedCarColor}`);
+        }
+
+        function endGameLogic() {
+            // Oyun sonu mantığı
+            finalPlayerNameDisplay.textContent = playerName;
+            finalScoreDisplay.textContent = 0; // Gerçek skor olacak
+            finalDriftScoreDisplay.textContent = 0; // Gerçek drift skoru olacak
+            finalCoinsCollectedDisplay.textContent = 0; // Gerçek toplanan jeton olacak
+
+            showScreen('end-game-screen');
+            hideGameUI();
+        }
+
+        // --- THREE.js Animasyon Döngüsü ---
+        function animate() {
+            requestAnimationFrame(animate);
+            // Burada oyun mantığı ve araba hareketleri işlenecek
+            // carMesh.rotation.y += 0.01; // Test için dönme
+
+            renderer.render(scene, camera);
+        }
+
+        // --- Olay Dinleyicileri ---
+        goToCarSelectionButton.addEventListener('click', () => {
+            if (playerNameInput.value.trim() === '') {
+                alert('Lütfen adınızı girin!');
+                return;
+            }
+            playerName = playerNameInput.value.trim();
+            localStorage.setItem('playerName', playerName); // Adı kaydet
+            displayPlayerName.textContent = playerName;
+            updateCoinsDisplay(); // Jetonları güncelle
+            renderCarSelection(); // Araba seçim ekranını hazırla
+            showScreen('car-selection-screen');
+        });
+
+        startGameButton.addEventListener('click', startGameLogic);
+        restartGameButton.addEventListener('click', startGameLogic); // Şimdilik aynı
+        backToSelectionButton.addEventListener('click', () => {
+            showScreen('car-selection-screen');
+            displayPlayerName.textContent = playerName; // Adı tekrar göster
+            updateCoinsDisplay();
+            renderCarSelection(); // Araba seçim ekranını yeniden yükle
+        });
+
+        // --- Uygulama Başlangıcı ---
+        initThreeJS();
+        initGame(); // Jetonları, kilitli arabaları ve ismi yükle
+        createCarMesh(selectedCarId, selectedCarColor); // Başlangıç arabasını oluştur
+
+
+        // PWA Service Worker Kaydı (önceki projedeki gibi)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+```
